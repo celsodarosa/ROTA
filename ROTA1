@@ -1,0 +1,159 @@
+{ "extends": "expo", "ignorePatterns": ["node_modules/", "android/", "ios/", "dist/"] }
+
+node_modules/
+.expo/
+dist/
+android/
+ios/
+*.apk
+*.aab
+.env
+.DS_Store
+
+import React, { useEffect, useState, createContext, useContext } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { colors } from './src/theme';
+import { currentUser, logout } from './src/storage';
+import LoginScreen from './src/screens/LoginScreen';
+import MapScreen from './src/screens/MapScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
+
+export const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function Tabs() {
+  return (
+    <Tab.Navigator screenOptions={({ route }) => ({
+      headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted,
+      tabBarIcon: ({ color, size }) => <Ionicons color={color} size={size}
+        name={route.name === 'Explorar' ? 'compass' : 'time'} />,
+    })}>
+      <Tab.Screen name="Explorar" component={MapScreen} />
+      <Tab.Screen name="Histórico" component={HistoryScreen} />
+    </Tab.Navigator>
+  );
+}
+
+export default function App() {
+  const [user, setUser] = useState(undefined);
+  useEffect(() => { currentUser().then(setUser); }, []);
+  if (user === undefined) return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={colors.primary} /></View>;
+  return (
+    <AuthContext.Provider value={{ user, setUser, signOut: async () => { await logout(); setUser(null); } }}>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {user ? <Stack.Screen name="Tabs" component={Tabs} /> : <Stack.Screen name="Login" component={LoginScreen} />}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthContext.Provider>
+  );
+}
+
+{
+  "expo": {
+    "name": "Rota",
+    "slug": "rota-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": { "bundleIdentifier": "com.exemplo.rota", "config": { "googleMapsApiKey": "SUA_CHAVE_AQUI" } },
+    "android": { "package": "com.exemplo.rota", "config": { "googleMaps": { "apiKey": "SUA_CHAVE_AQUI" } } }
+  }
+}
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+
+{
+  "name": "rota-app",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "eslint . --ext .js",
+    "test": "jest",
+    "validate": "npm run lint && npm test"
+  },
+  "dependencies": {
+    "expo": "~51.0.0",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-maps": "1.14.0",
+    "react-native-screens": "3.31.1",
+    "react-native-safe-area-context": "4.10.5",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.11.0",
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@expo/vector-icons": "^14.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-expo": "~51.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-expo": "~7.1.0",
+    "@types/react": "~18.2.79"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFiles": [
+      "./jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/android/",
+      "/ios/"
+    ]
+  }
+}
+
+# Rota — sugestões de lugares no trajeto (Android + iOS)
+
+## Estrutura
+```
+rota-app/
+├── App.js                    # Navegação (Login → Abas) + contexto de autenticação
+├── app.json                  # Config Expo (coloque a chave do Google Maps)
+├── package.json
+└── src/
+    ├── theme.js              # Paleta azul/branco, raios, sombras
+    ├── storage.js            # Cadastro/login/histórico (AsyncStorage – MVP)
+    ├── services/places.js    # Directions + Places API (sugestões ao longo da rota)
+    └── screens/
+        ├── LoginScreen.js    # Login/Cadastro
+        ├── MapScreen.js      # Mapa, origem/destino, categorias, lista de sugestões
+        └── HistoryScreen.js  # Histórico em lista
+```
+
+## Como rodar
+1. `npm install`
+2. No Google Cloud: ative **Maps SDK (Android/iOS), Directions API e Places API**, crie uma chave.
+3. Substitua `SUA_CHAVE_AQUI` em `app.json` e `src/services/places.js`.
+4. `npx expo start` → escaneie o QR code com o app Expo Go (Android/iOS).
+
+## Como funciona
+Rota (Directions) → amostra ~5 pontos do trajeto → busca lugares por categoria perto de cada ponto (Places) →
+filtra nota ≥ 4,0 e ≥ 20 avaliações → ordena por nota. Cada busca é salva no histórico do usuário.
+
+## Próximos passos recomendados
+- Trocar `storage.js` por Firebase Auth + Firestore (senha hasheada, sincronização entre aparelhos).
+- Mover chamadas às APIs do Google para um backend (proteger a chave).
+- Autocomplete de endereços, favoritos, abrir rota no Google Maps/Waze, filtro "aberto agora".
+
+## Validação com GitHub
+```
+git init && git add . && git commit -m "Rota: versão inicial"
+git branch -M main
+git remote add origin https://github.com/SEU_USUARIO/rota-app.git && git push -u origin main
+```
+- Cada push/PR roda **lint + testes + exportação Android** (aba *Actions*).
+- Em `main`, o job `apk` gera um **APK de teste** (aba *Actions* → execução → *Artifacts* → `rota-debug-apk`).
+- Chave do Google: *Settings → Secrets and variables → Actions → New secret* `GOOGLE_MAPS_API_KEY`.
+- Local: `npm run validate`.
